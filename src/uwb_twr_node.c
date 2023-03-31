@@ -80,6 +80,7 @@ static dwTime_t final_rx;
 
 float pressure, temperature, asl;
 bool pressure_ok;
+bool outstanding_request = false;
 
 uint32_t rangingTick;
 static volatile uint8_t curr_tag = 0;
@@ -99,6 +100,12 @@ uwbConfig_t config;
 // #define printf(...)
 #define debug(...) // printf(__VA_ARGS__)
 
+#define TYPE 0
+#define SEQ 1
+#define LPP_HEADER 2
+#define LPP_TYPE 3
+#define LPP_PAYLOAD 4
+
 static void txcallback(dwDevice_t *dev)
 {
   dwTime_t departure;
@@ -111,24 +118,18 @@ static void txcallback(dwDevice_t *dev)
     case POLL:
       poll_tx = departure;
       break;
-    case FINAL:
-      final_tx = departure;
-      break;
     case ANSWER:
       debug("ANSWER to %02x at %04x\r\n", txPacket.destAddress[0], (unsigned int)departure.low32);
       answer_tx = departure;
+      break;
+    case FINAL:
+      final_tx = departure;
       break;
     case REPORT:
       debug("REPORT\r\n");
       break;
   }
 }
-
-#define TYPE 0
-#define SEQ 1
-#define LPP_HEADER 2
-#define LPP_TYPE 3
-#define LPP_PAYLOAD 4
 
 static void rxcallback(dwDevice_t *dev) {
   dwTime_t arival = { .full=0 };
@@ -149,16 +150,42 @@ static void rxcallback(dwDevice_t *dev) {
     dwStartReceive(dev);
     return;
   }
-  debug("[%d] from %02x at %04x\r\n", rxPacket.payload[TYPE], 
-    rxPacket.sourceAddress[0], (unsigned int)arival.low32);
+
   memcpy(txPacket.destAddress, rxPacket.sourceAddress, 8);
   memcpy(txPacket.sourceAddress, rxPacket.destAddress, 8);
   
   switch(rxPacket.payload[TYPE]) {
-    // Tag received messages
+    // POLL message is sent from tag to anchor
+    // In this case, the node acts as an anchor
+    case POLL:
+      debug("POLL from %02x at %04x\r\n", rxPacket.sourceAddress[0], (unsigned int)arival.low32);
+      rangingTick = HAL_GetTick();
+      ledBlink(ledRanging, true);
+      // this is the requesting node (source)
+      curr_tag = rxPacket.sourceAddress[0];
+
+      int payloadLength = 2;
+      txPacket.payload[TYPE] = ANSWER;
+      // copy the sequence number of the transaction
+      txPacket.payload[SEQ] = rxPacket.payload[SEQ];
+
+      dwNewTransmit(dev);
+      dwSetDefaults(dev);
+      dwSetData(dev, (uint8_t*)&txPacket, MAC802154_HEADER_LENGTH+payloadLength);
+
+      dwWaitForResponse(dev, true);
+      dwStartTransmit(dev);
+
+      dwGetReceiveTimestamp(dev, &arival);
+      arival.full -= (ANTENNA_DELAY/2);
+      poll_rx = arival;
+      break;
+    // Answer is sent by anchor to tag
+    // In this case, the node acts as a tag
     case ANSWER:
       debug("ANSWER\r\n");
-
+      // Match sequence number to make sure its
+      // the same conversation
       if (rxPacket.payload[SEQ] != curr_seq) {
         debug("Wrong sequence number!\r\n");
         return;
@@ -177,8 +204,50 @@ static void rxcallback(dwDevice_t *dev) {
       arival.full -= (ANTENNA_DELAY/2);
       answer_rx = arival;
       break;
+    // Final is sent by tag to anchor
+    // In this case, the node acts as an anchor
+    case FINAL:
+    {
+      // make sure we are taking to the same tag
+      // curr_tag was stored during the POLL step
+      if (curr_tag == rxPacket.sourceAddress[0]) {
+        reportPayload_t *report = (reportPayload_t *)(txPacket.payload+2);
+
+        debug("FINAL\r\n");
+
+        dwGetReceiveTimestamp(dev, &arival);
+        arival.full -= (ANTENNA_DELAY/2);
+        final_rx = arival;
+
+        txPacket.payload[TYPE] = REPORT;
+        txPacket.payload[SEQ] = rxPacket.payload[SEQ];
+        memcpy(&report->pollRx, &poll_rx, 5);
+        memcpy(&report->answerTx, &answer_tx, 5);
+        memcpy(&report->finalRx, &final_rx, 5);
+        report->pressure = pressure;
+        report->temperature = temperature;
+        report->asl = asl;
+        report->pressure_ok = pressure_ok;
+
+        dwNewTransmit(dev);
+        dwSetDefaults(dev);
+        dwSetData(dev, (uint8_t*)&txPacket, MAC802154_HEADER_LENGTH+2+sizeof(reportPayload_t));
+
+        dwWaitForResponse(dev, true);
+        dwStartTransmit(dev);
+      } else {
+        dwNewReceive(dev);
+        dwSetDefaults(dev);
+        dwStartReceive(dev);
+      }
+
+      break;
+    }
+    // Report is sent by anchor to tag
+    // In this case, the node acts as a tag
     case REPORT:
     {
+      outstanding_request = false;
       reportPayload_t *report = (reportPayload_t *)(rxPacket.payload+2);
       double tround1, treply1, treply2, tround2, tprop_ctn, tprop, distance;
 
@@ -227,81 +296,20 @@ static void rxcallback(dwDevice_t *dev) {
       dwGetReceiveTimestamp(dev, &arival);
       arival.full -= (ANTENNA_DELAY/2);
       // printf("Total in-air time (ctn): 0x%08x\r\n", (unsigned int)(arival.low32-poll_tx.low32));
-      dwNewReceive(dev);
-      dwSetDefaults(dev);
-      dwStartReceive(dev);
       break;
     }
-    // Anchor received messages
-    case POLL:
-      debug("POLL from %02x at %04x\r\n", rxPacket.sourceAddress[0], (unsigned int)arival.low32);
-      rangingTick = HAL_GetTick();
-      ledBlink(ledRanging, true);
+    // case SHORT_LPP:
+    // {
+    //   if(curr_tag == rxPacket.sourceAddress[0] && dataLength-MAC802154_HEADER_LENGTH > 1) {
+    //     lppHandleShortPacket(&rxPacket.payload[1], dataLength-MAC802154_HEADER_LENGTH-1);
+    //   }
 
-      curr_tag = rxPacket.sourceAddress[0];
+    //   dwNewReceive(dev);
+    //   dwSetDefaults(dev);
+    //   dwStartReceive(dev);
 
-      int payloadLength = 2;
-      txPacket.payload[TYPE] = ANSWER;
-      txPacket.payload[SEQ] = rxPacket.payload[SEQ];
-
-      dwNewTransmit(dev);
-      dwSetDefaults(dev);
-      dwSetData(dev, (uint8_t*)&txPacket, MAC802154_HEADER_LENGTH+payloadLength);
-
-      dwWaitForResponse(dev, true);
-      dwStartTransmit(dev);
-
-      dwGetReceiveTimestamp(dev, &arival);
-      arival.full -= (ANTENNA_DELAY/2);
-      poll_rx = arival;
-      break;
-    case FINAL:
-    {
-      if (curr_tag == rxPacket.sourceAddress[0]) {
-        reportPayload_t *report = (reportPayload_t *)(txPacket.payload+2);
-
-        debug("FINAL\r\n");
-
-        dwGetReceiveTimestamp(dev, &arival);
-        arival.full -= (ANTENNA_DELAY/2);
-        final_rx = arival;
-
-        txPacket.payload[TYPE] = REPORT;
-        txPacket.payload[SEQ] = rxPacket.payload[SEQ];
-        memcpy(&report->pollRx, &poll_rx, 5);
-        memcpy(&report->answerTx, &answer_tx, 5);
-        memcpy(&report->finalRx, &final_rx, 5);
-        report->pressure = pressure;
-        report->temperature = temperature;
-        report->asl = asl;
-        report->pressure_ok = pressure_ok;
-
-        dwNewTransmit(dev);
-        dwSetDefaults(dev);
-        dwSetData(dev, (uint8_t*)&txPacket, MAC802154_HEADER_LENGTH+2+sizeof(reportPayload_t));
-
-        dwWaitForResponse(dev, true);
-        dwStartTransmit(dev);
-      } else {
-        dwNewReceive(dev);
-        dwSetDefaults(dev);
-        dwStartReceive(dev);
-      }
-
-      break;
-    }
-    case SHORT_LPP:
-    {
-      if(curr_tag == rxPacket.sourceAddress[0] && dataLength-MAC802154_HEADER_LENGTH > 1) {
-        lppHandleShortPacket(&rxPacket.payload[1], dataLength-MAC802154_HEADER_LENGTH-1);
-      }
-
-      dwNewReceive(dev);
-      dwSetDefaults(dev);
-      dwStartReceive(dev);
-
-      break;
-    }
+    //   break;
+    // }
   }
 }
 
@@ -324,6 +332,8 @@ void requestRange(dwDevice_t *dev)
 
   dwWaitForResponse(dev, true);
   dwStartTransmit(dev);
+  //
+  outstanding_request = true;
 }
 
 static uint32_t twrNodeOnEvent(dwDevice_t *dev, uwbEvent_t event)
@@ -332,23 +342,31 @@ static uint32_t twrNodeOnEvent(dwDevice_t *dev, uwbEvent_t event)
   switch(event) {
     case eventPacketReceived:
       rxcallback(dev);
+      return 1;
       break;
     case eventPacketSent:
       txcallback(dev);
+      return 1;
       break;
     case eventTimeout:
+      if(!outstanding_request)
+      {
+        dwNewReceive(dev);
+        dwSetDefaults(dev);
+        dwStartReceive(dev);
+      }
+      return 1;
+      break;
     case eventReceiveFailed:
-      dwNewReceive(dev);
-      dwSetDefaults(dev);
-      dwStartReceive(dev);
+      return 1;
       break;
     case eventRangeRequest:
       requestRange(dev);
+      return 1;
       break;
     default:
       configASSERT(false);
   }
-
   return MAX_TIMEOUT;
 }
 

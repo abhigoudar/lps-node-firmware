@@ -112,10 +112,6 @@ void uwbInit()
   dwTime_t delay = {.full = 0};
   dwSetAntenaDelay(dwm, delay);
 
-  // Reading and setting node configuration
-  // cfgReadU8(cfgAddress, &config.address[0]);
-  // cfgReadU8(cfgMode, &config.mode);
-
   config.mode = MODE_NODE;
   config.address[0] = NODE_ID;
   config.anchorListSize = 8;

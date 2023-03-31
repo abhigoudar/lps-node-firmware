@@ -63,7 +63,7 @@ typedef struct uwbRange_s {
 /////////
 #define MODE_NODE 2
 
-#define NODE_ID 11
+#define NODE_ID 12
 
 typedef enum uwbEvent_e {
   eventTimeout,

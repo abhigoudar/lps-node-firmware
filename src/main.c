@@ -60,15 +60,6 @@ static void changeAddress(uint8_t addr);
 static void handleSerialInput(char ch);
 static void handleRangeRequest(char* ch);
 static void handleButton(void);
-static void changeMode(unsigned int newMode);
-static void changeRadioMode(unsigned int newMode);
-static void changePower(uint8_t power);
-static void printModeList();
-static void printRadioModeList();
-static void printMode();
-static void printRadioMode();
-static void printPowerHelp();
-static void help();
 static void bootload(void);
 
 typedef enum {mainMenu, modeMenu, idMenu, radioMenu, powerMenu} Menu_t;
@@ -97,27 +88,6 @@ static void main_task(void *pvParameters) {
   ledOn(ledMode);
   buttonInit(buttonIdle);
 
-  // printf("\r\n\r\n====================\r\n");
-
-  // printf("SYSTEM\t: CPU-ID: ");
-  // for (i=0; i<12; i++) {
-  //   printf("%02x", uid[i]);
-  // }
-  // printf("\r\n");
-
-  // Initializing pressure sensor (if present ...)
-  // lps25hInit(&hi2c1);
-  // testSupportPrintStart("Initializing pressure sensor");
-  // if (lps25hTestConnection()) {
-  //   printf("[OK]\r\n");
-  //   lps25hSetEnabled(true);
-  // } else {
-  //   printf("[FAIL] (%u)\r\n", (unsigned int)hi2c1.ErrorCode);
-  //   selftestPasses = false;
-  // }
-
-  // testSupportPrintStart("Pressure sensor self-test");
-  // testSupportReport(&selftestPasses, lps25hSelfTest());
 
   // Initializing i2c eeprom
   eepromInit(&hi2c1);
@@ -142,38 +112,11 @@ static void main_task(void *pvParameters) {
     usbcommSetSystemStarted(true);
   }
 
-  // Printing UWB configuration
-  // struct uwbConfig_s * uwbConfig = uwbGetConfig();
-  // printf("CONFIG\t: Address is 0x%X\r\n", uwbConfig->address[0]);
-  // printf("CONFIG\t: Mode is %s\r\n", uwbAlgorithmName(uwbConfig->mode));
-  // printf("CONFIG\t: Tag mode anchor list (%i): ", uwbConfig->anchorListSize);
-  // for (i = 0; i < uwbConfig->anchorListSize; i++) {
-  //   printf("0x%02X ", uwbConfig->anchors[i]);
-  // }
-  // printf("\r\n");
-  // printf("CONFIG\t: Anchor position enabled: %s\r\n",
-  //        uwbConfig->positionEnabled?"true":"false");
-  // if (uwbConfig->positionEnabled) {
-  //   printf("CONFIG\t: Anchor position: %f %f %f\r\n", uwbConfig->position[0],
-  //                                                     uwbConfig->position[1],
-  //                                                     uwbConfig->position[2]);
-  // }
-  // printf("CONFIG\t: SmartPower enabled: %s\r\n", uwbConfig->smartPower?"True":"False");
-  // printf("CONFIG\t: Force TX power: %s\r\n", uwbConfig->forceTxPower?"True":"False");
-  // if(uwbConfig->forceTxPower) {
-  //   printf("CONFIG\t: TX power setting: %08X\r\n", (unsigned int)uwbConfig->txPower);
-  // }
-  // printf("CONFIG\t: Bitrate: %s\r\n", uwbConfig->lowBitrate?"low":"normal");
-  // printf("CONFIG\t: Preamble: %s\r\n", uwbConfig->longPreamble?"long":"normal");
-
   HAL_Delay(500);
 
   ledOff(ledRanging);
   ledOff(ledSync);
   ledOff(ledMode);
-
-  // printf("SYSTEM\t: Node started ...\r\n");
-  // printf("SYSTEM\t: Press 'h' for help.\r\n");
 
   usbcommSetSystemStarted(true);
 
@@ -182,20 +125,8 @@ static void main_task(void *pvParameters) {
 
   // Main loop ...
   while(1) {
-    // usbcommPrintWelcomeMessage();
-
+    //
     ledTick();
-    // handleButton();
-    // // Measure pressure
-    // if (uwbConfig.mode != modeSniffer) {
-    //   if(lps25hGetData(&pressure, &temperature, &asl)) {
-    //     pressure_ok = true;
-    //   } else {
-    //     printf("Fail reading pressure\r\n");
-    //     printf("pressure not ok\r\n");
-    //   }
-    // }
-
     // Accepts serial commands
 #ifdef USE_FTDI_UART
     if (HAL_UART_Receive(&huart1, (uint8_t*)&ch, 1, 0) == HAL_OK) {
@@ -236,7 +167,6 @@ static void handleRangeRequest(char* data_buf)
     {
       reqRange(data_buf[2]);
     }
-
 }
 
 static void handleButton(void) {
@@ -262,74 +192,74 @@ static void restConfig() {
   }
 }
 
-static void changeAddress(uint8_t addr) {
-  printf("Updating address to 0x%02X\r\n", addr);
-  cfgWriteU8(cfgAddress, addr);
-  if (cfgReadU8(cfgAddress, &addr)) {
-    printf("Device address: 0x%X\r\n", addr);
-  } else {
-    printf("Device address: Not found!\r\n");
-  }
-}
+// static void changeAddress(uint8_t addr) {
+//   printf("Updating address to 0x%02X\r\n", addr);
+//   cfgWriteU8(cfgAddress, addr);
+//   if (cfgReadU8(cfgAddress, &addr)) {
+//     printf("Device address: 0x%X\r\n", addr);
+//   } else {
+//     printf("Device address: Not found!\r\n");
+//   }
+// }
 
-static void changeMode(unsigned int newMode) {
-    printf("Previous device mode: ");
-    printMode();
+// static void changeMode(unsigned int newMode) {
+//     printf("Previous device mode: ");
+//     printMode();
 
-    cfgWriteU8(cfgMode, newMode);
+//     cfgWriteU8(cfgMode, newMode);
 
-    printf("New device mode: ");
-    printMode();
-}
+//     printf("New device mode: ");
+//     printMode();
+// }
 
-static void changePower(uint8_t power) { //expects [0, POWER_LEVELS-1] interval
-  // 000 11111 = 0x1F = 33.5dB = max power
-  // 110 00000 = 0xC0 = 0dB = min power
-  // first 3 bits can have 7 values 000 - 110  (111 means OFF)
+// static void changePower(uint8_t power) { //expects [0, POWER_LEVELS-1] interval
+//   // 000 11111 = 0x1F = 33.5dB = max power
+//   // 110 00000 = 0xC0 = 0dB = min power
+//   // first 3 bits can have 7 values 000 - 110  (111 means OFF)
 
-  // convert interval to [1, POWER_LEVELS]
-  if(power > POWER_LEVELS-1) {
-    power = POWER_LEVELS;
-  } else {
-    power++;
-  }
+//   // convert interval to [1, POWER_LEVELS]
+//   if(power > POWER_LEVELS-1) {
+//     power = POWER_LEVELS;
+//   } else {
+//     power++;
+//   }
 
-  float desired_db = (power * 1. / POWER_LEVELS )*33.5;
+//   float desired_db = (power * 1. / POWER_LEVELS )*33.5;
 
-  //split desired power between amplifier and mixer
-  uint8_t db_amp = (uint8_t) roundf( (desired_db * 18/33.5) / 3 ) * 3;  //rounded to 3dB steps (supported by amplifier)
-  float db_mix = roundf( (desired_db - db_amp) / 0.5 ) * 0.5; //rounded to 0.5dB steps (supported by mixer)
+//   //split desired power between amplifier and mixer
+//   uint8_t db_amp = (uint8_t) roundf( (desired_db * 18/33.5) / 3 ) * 3;  //rounded to 3dB steps (supported by amplifier)
+//   float db_mix = roundf( (desired_db - db_amp) / 0.5 ) * 0.5; //rounded to 0.5dB steps (supported by mixer)
 
-  // 7=111 minus (normalized db_amp values 1-6), all shifted to first 3 bits:
-  uint8_t amp_3bits = 0xE0 & (7-( db_amp / 3 + 1 ))<<5;  // 0xE0 bitmask 11100000
-  // mixer is 5 bits:
-  uint8_t mix_5bits = 0x1F & ( (uint8_t) (db_mix / 0.5) ); // 0x1F bitmask 00011111
+//   // 7=111 minus (normalized db_amp values 1-6), all shifted to first 3 bits:
+//   uint8_t amp_3bits = 0xE0 & (7-( db_amp / 3 + 1 ))<<5;  // 0xE0 bitmask 11100000
+//   // mixer is 5 bits:
+//   uint8_t mix_5bits = 0x1F & ( (uint8_t) (db_mix / 0.5) ); // 0x1F bitmask 00011111
 
-  uint8_t power_bits = amp_3bits | mix_5bits;
+//   uint8_t power_bits = amp_3bits | mix_5bits;
 
-  //copy power byte to all 4 bytes of txPower
-  uint32_t txPower = power_bits | (power_bits<<8) | (power_bits<<16) | (power_bits<<24);
-  printf("Setting txpower to: 0x%lX = %.1fdB\r\n", txPower, db_amp+db_mix);
-  cfgWriteU32(cfgTxPower, txPower);
-}
+//   //copy power byte to all 4 bytes of txPower
+//   uint32_t txPower = power_bits | (power_bits<<8) | (power_bits<<16) | (power_bits<<24);
+//   printf("Setting txpower to: 0x%lX = %.1fdB\r\n", txPower, db_amp+db_mix);
+//   cfgWriteU32(cfgTxPower, txPower);
+// }
 
-static void printModeList()
-{
-  unsigned int count = uwbAlgorithmCount();
-  int current_mode = -1;
-  uint8_t mode;
+// static void printModeList()
+// {
+//   unsigned int count = uwbAlgorithmCount();
+//   int current_mode = -1;
+//   uint8_t mode;
 
-  if (cfgReadU8(cfgMode, &mode)) {
-    current_mode = mode;
-  }
+//   if (cfgReadU8(cfgMode, &mode)) {
+//     current_mode = mode;
+//   }
 
-  printf("-------------------\r\n");
-  printf("Available UWB modes:\r\n");
-  for (int i=0; i<count; i++) {
-    printf(" %d - %s%s\r\n", i, uwbAlgorithmName(i),
-                             (i == current_mode)?" (Current mode)":"");
-  }
-}
+//   printf("-------------------\r\n");
+//   printf("Available UWB modes:\r\n");
+//   for (int i=0; i<count; i++) {
+//     printf(" %d - %s%s\r\n", i, uwbAlgorithmName(i),
+//                              (i == current_mode)?" (Current mode)":"");
+//   }
+// }
 
 
 static StaticTask_t xMainTask;
