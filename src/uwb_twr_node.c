@@ -80,10 +80,10 @@ static dwTime_t final_rx;
 
 float pressure, temperature, asl;
 bool pressure_ok;
-bool outstanding_request = false;
 
 uint32_t rangingTick;
 static volatile uint8_t curr_tag = 0;
+static bool rng_cov_on = false;
 
 static const double C = 299792458.0;       // Speed of light
 static const double tsfreq = 499.2e6 * 128;  // Timestamp counter frequency
@@ -96,7 +96,6 @@ static packet_t txPacket;
 static volatile uint8_t curr_seq = 0;
 static int curr_anchor = 0;
 uwbConfig_t config;
-
 // #define printf(...)
 #define debug(...) // printf(__VA_ARGS__)
 
@@ -237,14 +236,12 @@ static void rxcallback(dwDevice_t *dev) {
         dwSetDefaults(dev);
         dwStartReceive(dev);
       }
-
       break;
     }
     // Report is sent by anchor to tag
     // In this case, the node acts as a tag
     case REPORT:
     {
-      outstanding_request = false;
       reportPayload_t *report = (reportPayload_t *)(rxPacket.payload+2);
       double tround1, treply1, treply2, tround2, tprop_ctn, tprop, distance;
 
@@ -292,6 +289,7 @@ static void rxcallback(dwDevice_t *dev) {
       // printf("anc%d:%5d\n", rxPacket.sourceAddress[0], (unsigned int)(distance*1000));
       dwGetReceiveTimestamp(dev, &arival);
       arival.full -= (ANTENNA_DELAY/2);
+      rng_cov_on = false;
       // printf("Total in-air time (ctn): 0x%08x\r\n", (unsigned int)(arival.low32-poll_tx.low32));
       break;
     }
@@ -307,6 +305,11 @@ static void rxcallback(dwDevice_t *dev) {
 
     //   break;
     // }
+    default:
+    {
+      rng_cov_on = false;
+      break;
+    }
   }
 }
 
@@ -330,7 +333,7 @@ void requestRange(dwDevice_t *dev)
   dwWaitForResponse(dev, true);
   dwStartTransmit(dev);
   //
-  outstanding_request = true;
+  rng_cov_on = true;
 }
 
 static uint32_t twrNodeOnEvent(dwDevice_t *dev, uwbEvent_t event)
@@ -339,28 +342,21 @@ static uint32_t twrNodeOnEvent(dwDevice_t *dev, uwbEvent_t event)
   switch(event) {
     case eventPacketReceived:
       rxcallback(dev);
-      return 1;
-      break;
+      return 5;
     case eventPacketSent:
       txcallback(dev);
-      return 1;
-      break;
-    case eventTimeout:
-      if(!outstanding_request)
-      {
-        dwNewReceive(dev);
-        dwSetDefaults(dev);
-        dwStartReceive(dev);
-      }
-      return 1;
-      break;
+      return 5;
     case eventReceiveFailed:
-      return 1;
-      break;
+    case eventTimeout:
+      dwNewReceive(dev);
+      dwSetDefaults(dev);
+      dwStartReceive(dev);
+      rng_cov_on = false;
+      return 5;
     case eventRangeRequest:
-      requestRange(dev);
-      return 1;
-      break;
+      if(!rng_cov_on)
+        requestRange(dev);
+      return 5;
     default:
       configASSERT(false);
   }
