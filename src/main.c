@@ -128,13 +128,14 @@ static void main_task(void *pvParameters) {
     //
     ledTick();
     // Accepts serial commands
-#ifdef USE_FTDI_UART
-    if (HAL_UART_Receive(&huart1, (uint8_t*)&ch, 1, 0) == HAL_OK) {
-#else
+// #ifdef USE_FTDI_UART
+//     if (HAL_UART_Receive(&huart1, (uint8_t*)&ch, 1, 0) == HAL_OK) {
+// #else
     if(usbcommRead(&data_buf, 3)) {
-#endif
+// #endif
       // handleSerialInput(ch);
       handleRangeRequest(data_buf);
+      HAL_UART_Transmit(&huart1, (uint8_t *)data_buf[0], 1, HAL_MAX_DELAY);
     }
   }
 }
@@ -144,11 +145,11 @@ int _write (int fd, const void *buf, size_t count)
 {
   // stdout
   if (fd == 1) {
-    #ifdef USE_FTDI_UART
-      HAL_UART_Transmit(&huart1, (uint8_t *)buf, count, HAL_MAX_DELAY);
-    #else
+    // #ifdef USE_FTDI_UART
+    //   HAL_UART_Transmit(&huart1, (uint8_t *)buf, count, HAL_MAX_DELAY);
+    // #else
       usbcommWrite(buf, count);
-    #endif
+    // #endif
   }
 
   // stderr

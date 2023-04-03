@@ -102,9 +102,6 @@ uwbConfig_t config;
 
 #define TYPE 0
 #define SEQ 1
-#define LPP_HEADER 2
-#define LPP_TYPE 3
-#define LPP_PAYLOAD 4
 
 static void txcallback(dwDevice_t *dev)
 {
