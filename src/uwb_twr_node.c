@@ -83,7 +83,6 @@ bool pressure_ok;
 
 uint32_t rangingTick;
 static volatile uint8_t curr_tag = 0;
-static bool rng_cov_on = false;
 
 static const double C = 299792458.0;       // Speed of light
 static const double tsfreq = 499.2e6 * 128;  // Timestamp counter frequency
@@ -289,7 +288,6 @@ static void rxcallback(dwDevice_t *dev) {
       // printf("anc%d:%5d\n", rxPacket.sourceAddress[0], (unsigned int)(distance*1000));
       dwGetReceiveTimestamp(dev, &arival);
       arival.full -= (ANTENNA_DELAY/2);
-      rng_cov_on = false;
       // printf("Total in-air time (ctn): 0x%08x\r\n", (unsigned int)(arival.low32-poll_tx.low32));
       break;
     }
@@ -307,7 +305,6 @@ static void rxcallback(dwDevice_t *dev) {
     // }
     default:
     {
-      rng_cov_on = false;
       break;
     }
   }
@@ -333,12 +330,10 @@ void requestRange(dwDevice_t *dev)
   dwWaitForResponse(dev, true);
   dwStartTransmit(dev);
   //
-  rng_cov_on = true;
 }
 
 static uint32_t twrNodeOnEvent(dwDevice_t *dev, uwbEvent_t event)
 {
-  debug("Event:[%d]\n", event);
   switch(event) {
     case eventPacketReceived:
       rxcallback(dev);
@@ -347,15 +342,14 @@ static uint32_t twrNodeOnEvent(dwDevice_t *dev, uwbEvent_t event)
       txcallback(dev);
       return 5;
     case eventReceiveFailed:
-    case eventTimeout:
       dwNewReceive(dev);
       dwSetDefaults(dev);
       dwStartReceive(dev);
-      rng_cov_on = false;
+      return 5;
+    case eventTimeout:
       return 5;
     case eventRangeRequest:
-      if(!rng_cov_on)
-        requestRange(dev);
+      requestRange(dev);
       return 5;
     default:
       configASSERT(false);
