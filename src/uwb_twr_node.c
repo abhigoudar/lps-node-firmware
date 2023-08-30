@@ -139,7 +139,7 @@ static void rxcallback(dwDevice_t *dev) {
   dwGetData(dev, (uint8_t*)&rxPacket, dataLength);
 
   if (memcmp(rxPacket.destAddress, config.address, 8)) {
-    debug("Not for me! for %02x with %02x\r\n", rxPacket.destAddress[0], rxPacket.payload[0]);
+    debug("Not for me! for %02x me %02x \r \n", rxPacket.destAddress[0], config.address);
     dwNewReceive(dev);
     dwSetDefaults(dev);
     dwStartReceive(dev);
@@ -337,20 +337,19 @@ static uint32_t twrNodeOnEvent(dwDevice_t *dev, uwbEvent_t event)
   switch(event) {
     case eventPacketReceived:
       rxcallback(dev);
-      return 5;
+      break;
     case eventPacketSent:
       txcallback(dev);
-      return 5;
+      break;
+    case eventTimeout:
     case eventReceiveFailed:
       dwNewReceive(dev);
       dwSetDefaults(dev);
       dwStartReceive(dev);
-      return 5;
-    case eventTimeout:
-      return 5;
+      break;
     case eventRangeRequest:
       requestRange(dev);
-      return 5;
+      break;
     default:
       configASSERT(false);
   }

@@ -112,14 +112,17 @@ void uwbInit()
   dwTime_t delay = {.full = 0};
   dwSetAntenaDelay(dwm, delay);
 
-  config.mode = MODE_NODE;
+  config.mode = CURR_MODE;
   config.address[0] = NODE_ID;
+
   config.anchorListSize = 8;
   for(uint8_t i = 0; i < config.anchorListSize; i++)
   {
     config.anchors[i] = i;
   }
   //
+  // cfgReadU8(cfgAddress, &config.address[0]);
+  // cfgReadU8(cfgMode, &config.mode);
   // cfgFieldSize(cfgAnchorlist, &config.anchorListSize);
   // if (config.anchorListSize <= MAX_ANCHORS) {
   //   cfgReadU8list(cfgAnchorlist, config.anchors, config.anchorListSize);
