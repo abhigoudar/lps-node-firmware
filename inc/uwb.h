@@ -62,8 +62,9 @@ typedef struct uwbRange_s {
 #define MODE_TAG 1
 #define MODE_NODE 2
 
-#define NODE_ID 17
+#define NODE_ID 14
 #define CURR_MODE MODE_NODE
+// #define LPS_LONGER_RANGE
 
 typedef enum uwbEvent_e {
   eventTimeout,

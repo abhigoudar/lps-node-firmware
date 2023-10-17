@@ -55,6 +55,7 @@
 
 const uint8_t *uid = (uint8_t*)MCU_ID_ADDRESS;
 
+static void changePower(uint8_t power);
 static void restConfig();
 static void changeAddress(uint8_t addr);
 static void handleSerialInput(char ch);
@@ -94,8 +95,8 @@ static void main_task(void *pvParameters) {
   testSupportPrintStart("EEPROM self-test");
   testSupportReport(&selftestPasses, eepromTest());
 
-
   cfgInit();
+  changePower(POWER_LEVELS);
 
   // Initialising radio
   testSupportPrintStart("Initialize UWB ");
@@ -213,36 +214,37 @@ static void restConfig() {
 //     printMode();
 // }
 
-// static void changePower(uint8_t power) { //expects [0, POWER_LEVELS-1] interval
-//   // 000 11111 = 0x1F = 33.5dB = max power
-//   // 110 00000 = 0xC0 = 0dB = min power
-//   // first 3 bits can have 7 values 000 - 110  (111 means OFF)
+static void changePower(uint8_t power) { //expects [0, POWER_LEVELS-1] interval
+  // 000 11111 = 0x1F = 33.5dB = max power
+  // 110 00000 = 0xC0 = 0dB = min power
+  // first 3 bits can have 7 values 000 - 110  (111 means OFF)
 
-//   // convert interval to [1, POWER_LEVELS]
-//   if(power > POWER_LEVELS-1) {
-//     power = POWER_LEVELS;
-//   } else {
-//     power++;
-//   }
+  // convert interval to [1, POWER_LEVELS]
+  if(power > POWER_LEVELS-1) {
+    power = POWER_LEVELS;
+  } else {
+    power++;
+  }
 
-//   float desired_db = (power * 1. / POWER_LEVELS )*33.5;
+  float desired_db = (power * 1. / POWER_LEVELS )*33.5;
 
-//   //split desired power between amplifier and mixer
-//   uint8_t db_amp = (uint8_t) roundf( (desired_db * 18/33.5) / 3 ) * 3;  //rounded to 3dB steps (supported by amplifier)
-//   float db_mix = roundf( (desired_db - db_amp) / 0.5 ) * 0.5; //rounded to 0.5dB steps (supported by mixer)
+  //split desired power between amplifier and mixer
+  uint8_t db_amp = (uint8_t) roundf( (desired_db * 18/33.5) / 3 ) * 3;  //rounded to 3dB steps (supported by amplifier)
+  float db_mix = roundf( (desired_db - db_amp) / 0.5 ) * 0.5; //rounded to 0.5dB steps (supported by mixer)
 
-//   // 7=111 minus (normalized db_amp values 1-6), all shifted to first 3 bits:
-//   uint8_t amp_3bits = 0xE0 & (7-( db_amp / 3 + 1 ))<<5;  // 0xE0 bitmask 11100000
-//   // mixer is 5 bits:
-//   uint8_t mix_5bits = 0x1F & ( (uint8_t) (db_mix / 0.5) ); // 0x1F bitmask 00011111
+  // 7=111 minus (normalized db_amp values 1-6), all shifted to first 3 bits:
+  uint8_t amp_3bits = 0xE0 & (7-( db_amp / 3 + 1 ))<<5;  // 0xE0 bitmask 11100000
+  // mixer is 5 bits:
+  uint8_t mix_5bits = 0x1F & ( (uint8_t) (db_mix / 0.5) ); // 0x1F bitmask 00011111
 
-//   uint8_t power_bits = amp_3bits | mix_5bits;
+  uint8_t power_bits = amp_3bits | mix_5bits;
 
-//   //copy power byte to all 4 bytes of txPower
-//   uint32_t txPower = power_bits | (power_bits<<8) | (power_bits<<16) | (power_bits<<24);
-//   printf("Setting txpower to: 0x%lX = %.1fdB\r\n", txPower, db_amp+db_mix);
-//   cfgWriteU32(cfgTxPower, txPower);
-// }
+  //copy power byte to all 4 bytes of txPower
+  uint32_t txPower = power_bits | (power_bits<<8) | (power_bits<<16) | (power_bits<<24);
+  printf("Setting txpower to: 0x%lX = %.1fdB\r\n", txPower, db_amp+db_mix);
+  cfgWriteU8(cfgForceTxPower, 1);
+  cfgWriteU32(cfgTxPower, txPower);
+}
 
 // static void printModeList()
 // {

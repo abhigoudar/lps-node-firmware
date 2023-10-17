@@ -139,7 +139,7 @@ static void rxcallback(dwDevice_t *dev) {
   dwGetData(dev, (uint8_t*)&rxPacket, dataLength);
 
   if (memcmp(rxPacket.destAddress, config.address, 8)) {
-    debug("Not for me! for %02x me %02x \r \n", rxPacket.destAddress[0], config.address);
+    debug("Not for me! for %02x with %02x\r\n", rxPacket.destAddress[0], rxPacket.payload[0]);
     dwNewReceive(dev);
     dwSetDefaults(dev);
     dwStartReceive(dev);
@@ -329,6 +329,7 @@ void requestRange(dwDevice_t *dev)
 
   dwWaitForResponse(dev, true);
   dwStartTransmit(dev);
+  ledBlink(ledRanging, true);
   //
 }
 
@@ -341,8 +342,8 @@ static uint32_t twrNodeOnEvent(dwDevice_t *dev, uwbEvent_t event)
     case eventPacketSent:
       txcallback(dev);
       break;
-    case eventTimeout:
     case eventReceiveFailed:
+    case eventTimeout:
       dwNewReceive(dev);
       dwSetDefaults(dev);
       dwStartReceive(dev);
@@ -353,7 +354,7 @@ static uint32_t twrNodeOnEvent(dwDevice_t *dev, uwbEvent_t event)
     default:
       configASSERT(false);
   }
-  return MAX_TIMEOUT;
+  return 10; // return 10 ms timeout, be ready to listen
 }
 
 static void twrNodeInit(uwbConfig_t * newconfig, dwDevice_t *dev)

@@ -225,6 +225,7 @@ static int checkIrq()
 
 static void uwbTask(void* parameters)
 {
+  // TODO: Hoftix locking
   configASSERT(isInit);
 
   algorithm->init(&config, dwm);
