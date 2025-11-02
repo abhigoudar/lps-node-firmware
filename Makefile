@@ -1,7 +1,8 @@
 OPENOCD           ?= openocd
-OPENOCD_INTERFACE ?= interface/stlink-v2.cfg
+OPENOCD_INTERFACE ?= interface/stlink.cfg
+OPENOCD_CMDS      ?=
 REV               ?= B
-PYTHON2           ?= python2
+PYTHON           ?= python3
 # CFLAGS          += -fdiagnostics-color=auto
 # CFLAGS += -DUSE_FTDI_UART
 
@@ -13,7 +14,7 @@ else ifeq ($(strip $(REV)),B)
 HAL_ROOT=hal/stm32f0xx
 CPU=f0
 PROCESSOR=-mthumb -mcpu=cortex-m0 -DHSI48_VALUE="((uint32_t)48000000)" -DSTM32F072xB
-OPENOCD_TARGET    ?= target/stm32f0x_stlink.cfg
+OPENOCD_TARGET    ?= target/stm32f0x.cfg
 else
 $(error Rev.$(REV) unknown)
 endif
@@ -88,14 +89,14 @@ clean:
 	rm -f bin/lps-node-firmware.elf bin/lps-node-firmware.dfu bin/.map $(OBJS)
 
 flash:
-	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) -f $(OPENOCD_TARGET) -c init -c targets -c "reset halt" \
+	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) $(OPENOCD_CMDS) -f $(OPENOCD_TARGET) -c init -c targets -c "reset halt" \
 	           -c "flash write_image erase bin/lps-node-firmware.elf" -c "verify_image bin/lps-node-firmware.elf" -c "reset run" -c shutdown
 erase:
-	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) -f $(OPENOCD_TARGET) -c init -c targets -c "reset halt" \
+	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) $(OPENOCD_CMDS) -f $(OPENOCD_TARGET) -c init -c targets -c "reset halt" \
 	           -c "stm32f1x mass_erase 0" -c shutdown
 
 openocd:
-	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) -f $(OPENOCD_TARGET) -c init -c targets
+	$(OPENOCD) -d2 -f $(OPENOCD_INTERFACE) $(OPENOCD_CMDS) -f $(OPENOCD_TARGET) -c init -c targets
 
 dfu:
 	dfu-util -d 0483:df11 -a 0 -D bin/lps-node-firmware.dfu -s :leave
@@ -109,7 +110,7 @@ reset_and_dfu:
 	$(OBJCOPY) $^ -O binary $@
 
 %.dfu: %.bin
-	$(PYTHON2) tools/make/dfu-convert.py -b $(LOAD_ADDRESS):$^ $@
+	$(PYTHON) tools/make/dfu-convert.py -b $(LOAD_ADDRESS):$^ $@
 
 check_submodules:
-	$(PYTHON2) tools/make/check-for-submodules.py
+	$(PYTHON) tools/make/check-for-submodules.py
