@@ -56,6 +56,12 @@ typedef struct uwbRange_s {
   uint8_t src;
   uint8_t anchor;
   uint32_t data;
+  uint32_t poll_tx;
+  uint32_t poll_rx;
+  uint32_t answer_rx;
+  uint32_t answer_tx;
+  uint32_t final_rx;
+  uint32_t final_tx;
 } uwbRange_t;
 
 #define MODE_ANCHOR 0
