@@ -56,8 +56,8 @@ typedef struct uwbRange_s {
   uint8_t src;
   uint8_t anchor;
   uint32_t data;
-  uint32_t poll_tx;
   uint32_t poll_rx;
+  uint32_t poll_tx;
   uint32_t answer_rx;
   uint32_t answer_tx;
   uint32_t final_rx;
@@ -68,7 +68,7 @@ typedef struct uwbRange_s {
 #define MODE_TAG 1
 #define MODE_NODE 2
 
-#define NODE_ID 14
+#define NODE_ID 10
 #define CURR_MODE MODE_NODE
 // #define LPS_LONGER_RANGE
 

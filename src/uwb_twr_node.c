@@ -283,12 +283,12 @@ static void rxcallback(dwDevice_t *dev) {
       range.header = 0xA8;
       range.anchor = rxPacket.sourceAddress[0];
       range.data = (unsigned int)(distance*1000);
-      range.poll_rx = poll_rx.low32;
-      range.poll_tx = poll_tx.low32;
-      range.answer_rx = answer_rx.low32;
-      range.answer_tx = answer_tx.low32;
-      range.final_rx = final_rx.low32;
-      range.final_tx = final_tx.low32;
+      range.poll_rx = (unsigned int)(poll_rx.low32);
+      range.poll_tx = (unsigned int)(poll_tx.low32);
+      range.answer_rx = (unsigned int)(answer_rx.low32);
+      range.answer_tx = (unsigned int)(answer_tx.low32);
+      range.final_rx = (unsigned int)(final_rx.low32);
+      range.final_tx = (unsigned int)(final_tx.low32);
       unsigned char* ptr = (unsigned char*)&range;
       int bytesWritten = write(1, ptr, sizeof(range));
       // printf("anc%d:%5d\n", rxPacket.sourceAddress[0], (unsigned int)(distance*1000));
